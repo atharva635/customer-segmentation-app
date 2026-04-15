@@ -1,18 +1,22 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import MinMaxScaler
 import altair as alt
 import plotly.express as px
 import plotly.graph_objects as go
+import time
+import pickle
+import io
 
 # --- PAGE CONFIG ---
 st.set_page_config(
     page_title="Customer Segmentation App",
     page_icon="🛍️",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # --- ADVANCED CUSTOM CSS FOR PREMIUM UI/UX ---
@@ -36,7 +40,7 @@ st.markdown("""
         padding: 40px;
         border-radius: 20px;
         text-align: center;
-        margin-bottom: 30px;
+        margin-bottom: 20px;
         box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         position: relative;
         overflow: hidden;
@@ -98,8 +102,29 @@ st.markdown("""
         transform: scale(1.02) !important;
     }
     .stSlider > div > div > div > div { background: #7C3AED !important; }
+    
+    /* Pipeline UI */
+    .pipeline-bar {
+        text-align: center;
+        background: rgba(0,0,0,0.3);
+        padding: 15px;
+        border-radius: 50px;
+        color: #A78BFA;
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin-bottom: 40px;
+        border: 1px solid rgba(167, 139, 250, 0.2);
+    }
+    .pipeline-arrow {
+        color: #4DA8DA;
+        margin: 0 10px;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+# --- SIDEBAR (EXPORT ZONE) ---
+st.sidebar.markdown("<h2 style='color:white; text-align:center;'>⬇️ Export Center</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<p style='color:#94A3B8; text-align:center;'>Download generated assets</p><hr>", unsafe_allow_html=True)
 
 # --- HEADER SECTION ---
 st.markdown("""
@@ -112,6 +137,14 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# --- PIPELINE UI ---
+st.markdown("""
+<div class="pipeline-bar">
+    📂 Data <span class="pipeline-arrow">➔</span> 📊 EDA <span class="pipeline-arrow">➔</span> 🤖 Clustering <span class="pipeline-arrow">➔</span> 📈 Evaluation <span class="pipeline-arrow">➔</span> 🎯 Prediction & Business Insights
+</div>
+""", unsafe_allow_html=True)
+
+
 @st.cache_data
 def load_data():
     return pd.read_csv("Mall_Customers.csv")
@@ -120,8 +153,8 @@ df = load_data()
 
 
 # --- 1. EXPLORATORY DATA ANALYSIS ---
-st.markdown("### 🔍 Exploratory Data Analysis")
-st.markdown("<p style='color:#94A3B8; margin-bottom:20px;'>Mirroring the Colab visualizations for initial dataset understanding.</p>", unsafe_allow_html=True)
+st.markdown("### 🔍 Exploratory Data Analysis (EDA)")
+st.markdown("<p style='color:#94A3B8; margin-bottom:20px;'>Pre-Clustering Data Distributions.</p>", unsafe_allow_html=True)
 
 eda_c1, eda_c2, eda_c3 = st.columns(3)
 
@@ -156,25 +189,38 @@ with eda_c3:
 st.markdown("<hr style='border-color: rgba(255,255,255,0.1); margin:40px 0;'>", unsafe_allow_html=True)
 
 
-# --- 2. TRAIN K-MEANS MODEL ---
+# --- 2. MODEL TRAINING (WITH ANIMATION & AUTO-K) ---
 X = df[['Annual Income (k$)', 'Spending Score (1-100)']].values
 
 @st.cache_resource
 def train_model(X_data):
-    model = KMeans(n_clusters=5, init='k-means++', random_state=42)
-    labels = model.fit_predict(X_data)
-    sil_score = silhouette_score(X_data, labels)
-    
-    # Calculate WCSS (Inertia) for Elbow method
-    wcss = []
-    for k in range(1, 11):
-        km = KMeans(n_clusters=k, init='k-means++', random_state=42)
-        km.fit(X_data)
-        wcss.append(km.inertia_)
+    with st.spinner("🤖 Discovering Data Patterns dynamically..."):
+        time.sleep(1.5) # Simulate processing for presentation flair
         
-    return model, labels, sil_score, wcss
+        # Calculate WCSS (Inertia) & Silhouette for Auto-K Selection
+        wcss = []
+        sil_scores = []
+        K_range_sil = range(2, 11)
+        
+        # We need inertia for 1 to 10
+        wcss.append(KMeans(n_clusters=1, init='k-means++', random_state=42).fit(X_data).inertia_)
+        
+        for k in K_range_sil:
+            km = KMeans(n_clusters=k, init='k-means++', random_state=42)
+            labels = km.fit_predict(X_data)
+            wcss.append(km.inertia_)
+            sil_scores.append(silhouette_score(X_data, labels))
+            
+        best_k = K_range_sil[np.argmax(sil_scores)]
+        
+        # Train final optimal model
+        model = KMeans(n_clusters=best_k, init='k-means++', random_state=42)
+        labels = model.fit_predict(X_data)
+        final_sil = silhouette_score(X_data, labels)
+        
+    return model, labels, final_sil, wcss, sil_scores, best_k
 
-model, cluster_labels, sil_score, inertia_values = train_model(X)
+model, cluster_labels, sil_score, inertia_values, silhouette_values, best_k_auto = train_model(X)
 
 cluster_names = {}
 centers = model.cluster_centers_
@@ -194,27 +240,45 @@ color_scale = alt.Scale(domain=[
     "Budget Customer", "Impulsive Customer", "Medium Customer", 
     "Target Customer", "Premium Customer"
 ], range=['#FF4B4B', '#4DA8DA', '#34D399', '#FBBF24', '#A78BFA'])
+plotly_colors = {'Budget Customer': '#FF4B4B', 'Impulsive Customer': '#4DA8DA', 'Medium Customer': '#34D399', 'Target Customer': '#FBBF24', 'Premium Customer': '#A78BFA'}
 
+# Model & Data Exports
+st.sidebar.download_button(
+    label="📄 Download Clustered Data (.CSV)",
+    data=df.to_csv(index=False),
+    file_name="clustered_mall_customers.csv",
+    mime="text/csv"
+)
+
+# Export Pickle properly
+model_bytes = pickle.dumps(model)
+st.sidebar.download_button(
+    label="⚙️ Download K-Means Model (.PKL)",
+    data=model_bytes,
+    file_name="kmeans_model.pkl",
+    mime="application/octet-stream"
+)
 
 # --- 3. MAIN PREDICTION & CLUSTERING SECTION ---
 col1, space, col2 = st.columns([2, 0.1, 1.2])
 
 with col1:
-    st.markdown("### 📊 Customer Segments Visualized")
+    st.markdown("### 🤖 K-Means Clustering Result")
+    st.markdown("<p style='color:#94A3B8; margin-bottom:10px;'>Post-clustering boundary assignments.</p>", unsafe_allow_html=True)
     chart = alt.Chart(df).mark_circle(size=120, opacity=0.9).encode(
         x=alt.X('Annual Income (k$):Q', title='Annual Income (k$)', scale=alt.Scale(zero=False)),
         y=alt.Y('Spending Score (1-100):Q', title='Spending Score (1-100)', scale=alt.Scale(zero=False)),
         color=alt.Color('Customer Segment:N', scale=color_scale, legend=alt.Legend(title="Segments", orient="bottom", titleColor="white", labelColor="white")),
         tooltip=['Age', 'Gender', 'Annual Income (k$)', 'Spending Score (1-100)', 'Customer Segment']
-    ).interactive().properties(height=480, background='transparent')
+    ).interactive().properties(height=450, background='transparent')
     
     st.altair_chart(apply_theme(chart), use_container_width=True)
 
 with col2:
-    st.markdown("### 🎯 Predict New Segment")
+    st.markdown("### 🎯 Real-Time Custom Prediction")
     
     with st.form("custom_predict"):
-        st.markdown("<p style='color:#CBD5E1;'>Enter customer details to analyse their cluster.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='color:#CBD5E1;'>Enter details to predict cluster.</p>", unsafe_allow_html=True)
         income = st.slider("💰 Annual Income (k$)", min_value=0, max_value=150, value=60, step=1)
         spending = st.slider("🛒 Spending Score", min_value=0, max_value=100, value=50, step=1)
         
@@ -222,59 +286,71 @@ with col2:
         submitted = st.form_submit_button("✨ Analyze Customer ✨")
         
     if submitted:
-        new_customer = [[income, spending]]
-        cluster_idx = model.predict(new_customer)[0]
-        segment = cluster_names[cluster_idx]
-        
-        if segment == "Budget Customer":
-            icon, desc = "🪙", "This customer has LOW income and LOW spending.<br>👉 They are budget customers who spend less."
-        elif segment == "Impulsive Customer":
-            icon, desc = "🛍️", "This customer has LOW income but HIGH spending.<br>👉 They spend more than expected → impulsive buyers."
-        elif segment == "Target Customer":
-            icon, desc = "🎯", "This customer has HIGH income but LOW spending.<br>👉 They can spend more but currently don’t.<br>👉 Businesses target them with offers → 'Target Customers'."
-        elif segment == "Premium Customer":
-            icon, desc = "💎", "This customer has HIGH income and HIGH spending.<br>👉 These are premium customers (very valuable)."
-        else:
-            icon, desc = "🛒", "This customer has MEDIUM income and MEDIUM spending.<br>👉 They are normal/average customers."
+        with st.spinner("Classifying..."):
+            time.sleep(0.5)
+            new_customer = [[income, spending]]
+            cluster_idx = model.predict(new_customer)[0]
+            segment = cluster_names[cluster_idx]
             
-        st.markdown(f"""
-        <div class="glass-card" style="border-left: 5px solid #A78BFA; animation: fadeIn 0.5s; padding: 20px;">
-            <p style="margin:0; font-size:0.9rem; color:#94A3B8;">========== CUSTOMER ANALYSIS ==========</p>
-            <h3 style="border-bottom:none; margin:10px 0; color:#A78BFA;">{icon} Cluster Assigned</h3>
-            <p style="margin:0; font-weight:600; color:white;">Customer Type: {segment}</p>
-            <br>
-            <p style="margin:0; font-size:1rem; color:#4DA8DA; font-weight:bold;">🔍 Explanation:</p>
-            <p style="margin-top:5px; line-height:1.5;">{desc}</p>
-        </div>
-        """, unsafe_allow_html=True)
+            if segment == "Budget Customer":
+                icon, logic = "🪙", "Low Income & Low Spending"
+            elif segment == "Impulsive Customer":
+                icon, logic = "🛍️", "Low Income & High Spending"
+            elif segment == "Target Customer":
+                icon, logic = "🎯", "High Income & Low Spending"
+            elif segment == "Premium Customer":
+                icon, logic = "💎", "High Income & High Spending"
+            else:
+                icon, logic = "🛒", "Medium Income & Medium Spending"
+                
+            st.markdown(f"""
+            <div class="glass-card" style="border-left: 5px solid #A78BFA; animation: fadeIn 0.5s; padding: 20px; margin-top:20px;">
+                <h4 style="margin:0; color:#A78BFA;">{icon} Predicted Segment</h4>
+                <h3 style="margin:5px 0 10px 0; color:white;">{segment}</h3>
+                <p style="margin:0; font-size:0.95rem; color:#4DA8DA; font-weight:bold;">📊 Data Reason:</p>
+                <p style="margin:5px 0 0 0; color:#CBD5E1; font-size:0.9rem;">{logic} → Falls into Cluster {cluster_idx}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-# --- 4. ADVANCED UNSUPERVISED LEARNING VISUALS (NEW) ---
+# --- 4. ADVANCED UNSUPERVISED LEARNING VISUALS ---
 st.markdown("<hr style='border-color: rgba(255,255,255,0.1); margin:40px 0;'>", unsafe_allow_html=True)
-st.markdown("### 🌌 3D Unsupervised Spatial Mapping")
-st.markdown("<p style='color:#CBD5E1; margin-bottom:20px;'>Plotting all 3 primary dimensions (Age, Income, Spending) interactively to prove how our Unsupervised K-Means clustering algorithm dominates the hyper-dimensional spatial data.</p>", unsafe_allow_html=True)
+st.markdown("### 🌌 3D Spatial Mapping & Cluster Density")
+st.markdown("<p style='color:#CBD5E1; margin-bottom:20px;'>Plotting all 3 primary dimensions interactively, along with segment sizes.</p>", unsafe_allow_html=True)
 
-plotly_colors = {'Budget Customer': '#FF4B4B', 'Impulsive Customer': '#4DA8DA', 'Medium Customer': '#34D399', 'Target Customer': '#FBBF24', 'Premium Customer': '#A78BFA'}
+adv_c1, adv_c2 = st.columns([2, 1])
 
-fig_3d = px.scatter_3d(df, x='Age', y='Annual Income (k$)', z='Spending Score (1-100)',
-                     color='Customer Segment', opacity=0.8,
-                     color_discrete_map=plotly_colors)
+with adv_c1:
+    fig_3d = px.scatter_3d(df, x='Age', y='Annual Income (k$)', z='Spending Score (1-100)',
+                         color='Customer Segment', opacity=0.8,
+                         color_discrete_map=plotly_colors)
+    fig_3d.update_layout(
+        scene=dict(
+            xaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="rgba(255,255,255,0.1)", showbackground=False, title_font=dict(color='white'), tickfont=dict(color='white')),
+            yaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="rgba(255,255,255,0.1)", showbackground=False, title_font=dict(color='white'), tickfont=dict(color='white')),
+            zaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="rgba(255,255,255,0.1)", showbackground=False, title_font=dict(color='white'), tickfont=dict(color='white'))
+        ),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=0, r=0, b=0, t=0),
+        legend=dict(font=dict(color="white"), bgcolor="rgba(0,0,0,0)", orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
+    )
+    st.plotly_chart(fig_3d, use_container_width=True)
 
-fig_3d.update_layout(
-    scene=dict(
-        xaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="rgba(255,255,255,0.1)", showbackground=False, title_font=dict(color='white'), tickfont=dict(color='white')),
-        yaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="rgba(255,255,255,0.1)", showbackground=False, title_font=dict(color='white'), tickfont=dict(color='white')),
-        zaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="rgba(255,255,255,0.1)", showbackground=False, title_font=dict(color='white'), tickfont=dict(color='white'))
-    ),
-    paper_bgcolor='rgba(0,0,0,0)',
-    plot_bgcolor='rgba(0,0,0,0)',
-    margin=dict(l=0, r=0, b=0, t=0),
-    legend=dict(font=dict(color="white"), bgcolor="rgba(0,0,0,0)")
-)
-st.plotly_chart(fig_3d, use_container_width=True)
+with adv_c2:
+    cluster_counts = df['Customer Segment'].value_counts()
+    fig_pie = px.pie(values=cluster_counts.values, names=cluster_counts.index, 
+                     color=cluster_counts.index, color_discrete_map=plotly_colors, hole=0.4)
+    fig_pie.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)', 
+        plot_bgcolor='rgba(0,0,0,0)',
+        showlegend=False,
+        annotations=[dict(text='Market<br>Share', x=0.5, y=0.5, font_size=16, font_color='white', showarrow=False)]
+    )
+    fig_pie.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='#0A0F24', width=2)))
+    st.plotly_chart(fig_pie, use_container_width=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
-st.markdown("### 🧬 Cluster 'DNA' Profiling")
-st.markdown("<p style='color:#CBD5E1; margin-bottom:20px;'>Analyzing the exact behavioral trait distributions (Age, Income, Spending) of each specific unsupervised cluster through aggregated normalized Radar Charts.</p>", unsafe_allow_html=True)
+st.markdown("### 🧬 Exact Cluster 'DNA' Profiling")
 
 radar_cols = st.columns(5)
 metrics = ['Age', 'Annual Income (k$)', 'Spending Score (1-100)']
@@ -296,89 +372,84 @@ for i, row in cluster_means.iterrows():
     fig.add_trace(go.Scatterpolar(
         r=[row['Age'], row['Annual Income (k$)'], row['Spending Score (1-100)'], row['Age']],
         theta=['Age', 'Income', 'Spending', 'Age'],
-        fill='toself',
-        name=seg,
-        line_color=c_hex
+        fill='toself', name=seg, line_color=c_hex
     ))
     fig.update_traces(opacity=0.7)
     fig.update_layout(
         polar=dict(
             radialaxis=dict(visible=False, range=[0, 1]),
-            bgcolor='rgba(0,0,0,0)',
-            angularaxis=dict(color="white", tickfont=dict(size=11))
+            bgcolor='rgba(0,0,0,0)', angularaxis=dict(color="white", tickfont=dict(size=11))
         ),
-        showlegend=False,
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        margin=dict(l=25, r=25, t=30, b=25),
-        title=dict(text=seg, font=dict(color=c_hex, size=15), x=0.5, y=0.98)
+        showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=25, r=25, t=30, b=25), title=dict(text=seg, font=dict(color=c_hex, size=15), x=0.5, y=0.98)
     )
     radar_cols[col_idx].plotly_chart(fig, use_container_width=True)
 
 
-# --- 5. ELBOW METHOD ---
+# --- 5. EVALUATION: AUTO K & ELBOW ---
 st.markdown("<hr style='border-color: rgba(255,255,255,0.1); margin:40px 0;'>", unsafe_allow_html=True)
-st.markdown("### 📉 Elbow Method for Optimal Clusters")
+st.markdown("### 📉 Model Evaluation & Auto-Cluster Detection")
 
-eb_col1, eb_col2 = st.columns([1.5, 2])
+eb_col1, eb_col2, eb_col3 = st.columns([1.2, 1.5, 1.5])
 
 with eb_col1:
-    st.markdown("""
-    <div style="margin-bottom: 15px;">
-        <h4 style="color:#A78BFA; font-weight:600; text-transform:uppercase; letter-spacing:1px; margin-bottom:5px;">Determining the Optimal Number of Clusters</h4>
-    </div>
-    <p style="color:#CBD5E1; font-size:1.05rem; line-height:1.6;">
-    The Elbow Method plots the number of clusters (K) against Inertia (within-cluster sum of squares). As K increases, inertia decreases, but at some point the rate of decrease sharply slows—forming an "elbow" shape. 
-    This elbow point indicates the optimal number of clusters where adding more clusters yields diminishing returns.
-    </p>
-    <p style="color:#CBD5E1; font-size:1.05rem; line-height:1.6; margin-top:15px;">
-    For our customer segmentation analysis, the elbow point was clearly identified at <strong>K = 5</strong>, suggesting five distinct customer groups provide the best balance between cluster compactness and model simplicity.
-    </p>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="glass-card" style="display:inline-block; border-left: 5px solid #3B82F6; margin-top:10px; padding: 15px 30px;">
-        <h3 style="margin:0; border:none; padding:0; color:#4DA8DA; font-size:2.4rem; justify-content:center;">K=5</h3>
-        <p style="margin:0; font-weight:bold; letter-spacing:1px; color:#94A3B8; text-transform:uppercase; font-size:0.85rem; text-align:center;">Optimal Clusters<br>Identified</p>
+    st.markdown(f"""
+    <div class="glass-card" style="border-left: 5px solid #FBBF24;">
+        <h4 style="color:#A78BFA; margin-top:0;">Auto-Detected Best 'K'</h4>
+        <h1 style="color:#FBBF24; font-size:4rem; margin:0; line-height:1;">{best_k_auto}</h1>
+        <p style="color:#CBD5E1; font-size:1rem; margin-top:10px;">Our algorithm automatically computed the Silhouette Score for clusters 2 through 10 and dynamically identified <strong>K={best_k_auto}</strong> as mathematically optimal without human bias.</p>
     </div>
     """, unsafe_allow_html=True)
 
 with eb_col2:
     elbow_df = pd.DataFrame({'Number of Clusters (K)': range(1, 11), 'Inertia (WCSS)': inertia_values})
-    elbow_base = alt.Chart(elbow_df).encode(x=alt.X('Number of Clusters (K):O', title='Number of Clusters (K)', axis=alt.Axis(labelAngle=0)))
+    elbow_base = alt.Chart(elbow_df).encode(x=alt.X('Number of Clusters (K):O', title='Clusters (K)', axis=alt.Axis(labelAngle=0)))
     elbow_line = elbow_base.mark_line(color='#4DA8DA', strokeWidth=3).encode(y=alt.Y('Inertia (WCSS):Q', title='Inertia / WCSS'))
-    elbow_points = elbow_base.mark_circle(color='#FBBF24', size=80, opacity=1).encode(y=alt.Y('Inertia (WCSS):Q'), tooltip=['Number of Clusters (K)', 'Inertia (WCSS)'])
+    elbow_points = elbow_base.mark_circle(color='#3B82F6', size=80).encode(y=alt.Y('Inertia (WCSS):Q'), tooltip=['Number of Clusters (K)', 'Inertia (WCSS)'])
     
-    elbow_chart = (elbow_line + elbow_points).interactive().properties(height=320, background='transparent')
-    st.altair_chart(apply_theme(elbow_chart).configure_axis(domainColor='rgba(255, 255, 255, 0.2)'), use_container_width=True)
+    elbow_chart = (elbow_line + elbow_points).interactive().properties(height=280, title="Elbow Method", background='transparent')
+    st.altair_chart(apply_theme(elbow_chart), use_container_width=True)
 
-# --- 6. REASONING CARDS ---
+with eb_col3:
+    sil_df = pd.DataFrame({'Number of Clusters (K)': range(2, 11), 'Silhouette Score': silhouette_values})
+    sil_base = alt.Chart(sil_df).encode(x=alt.X('Number of Clusters (K):O', title='Clusters (K)', axis=alt.Axis(labelAngle=0)))
+    sil_line = sil_base.mark_line(color='#FBBF24', strokeWidth=3).encode(y=alt.Y('Silhouette Score:Q', title='Silhouette Score', scale=alt.Scale(zero=False)))
+    sil_points = sil_base.mark_circle(color='#F59E0B', size=80).encode(y=alt.Y('Silhouette Score:Q'), tooltip=['Number of Clusters (K)', 'Silhouette Score'])
+    
+    sil_chart = (sil_line + sil_points).interactive().properties(height=280, title="Silhouette Score Validation", background='transparent')
+    st.altair_chart(apply_theme(sil_chart), use_container_width=True)
+
+# --- 6. BUSINESS STRATEGY INSIGHTS ---
 st.markdown("<hr style='border-color: rgba(255,255,255,0.1); margin:40px 0;'>", unsafe_allow_html=True)
-st.markdown("### 💡 Model Evaluation & Project Reasoning")
+st.markdown("### 💼 Real-World Business Strategies")
+st.markdown("<p style='color:#CBD5E1; margin-bottom:20px;'>Transforming machine learning boundaries into actionable product marketing.</p>", unsafe_allow_html=True)
 
-c1, c2, c3 = st.columns(3)
+b1, b2, b3 = st.columns(3)
 
-with c1:
-    st.markdown(f"""
-    <div class="glass-card">
-        <h3 style="color: #4DA8DA;">📐 ≈ {sil_score:.2f} Silhouette Score</h3>
-        <p>This score indicates strong clustering quality. It measures how perfectly separated our {len(cluster_names)} customer groups are mathematically from each other, validating our model's accuracy.</p>
+with b1:
+    st.markdown("""
+    <div class="glass-card" style="border-top: 4px solid #A78BFA;">
+        <h3 style="color:#A78BFA; margin-top:0;">💎 Premium Customers</h3>
+        <p><strong>Action:</strong> Push luxury items & VIP memberships.</p>
+        <p style="font-size:0.9rem; color:#94A3B8;">Since they have high income and spend heavily, target them with exclusive early-access sales and expensive high-margin products.</p>
     </div>
     """, unsafe_allow_html=True)
 
-with c2:
+with b2:
     st.markdown("""
-    <div class="glass-card">
-        <h3 style="color: #FBBF24;">🤖 Why K-Means Algorithm?</h3>
-        <p>We selected K-Means because it is exceptionally efficient at finding hidden patterns and grouping numerical data without needing pre-labeled training datasets. It is the industry standard for customer segmentation.</p>
+    <div class="glass-card" style="border-top: 4px solid #FBBF24;">
+        <h3 style="color:#FBBF24; margin-top:0;">🎯 Target Customers</h3>
+        <p><strong>Action:</strong> Send targeted conversion offers.</p>
+        <p style="font-size:0.9rem; color:#94A3B8;">They have high income but low spending. They are the biggest untapped potential. Send them tailored discounts to convert them into Premium spenders.</p>
     </div>
     """, unsafe_allow_html=True)
     
-with c3:
+with b3:
     st.markdown("""
-    <div class="glass-card">
-        <h3 style="color: #34D399;">📊 Why Income & Spending?</h3>
-        <p>These two features were specifically chosen because they directly reflect a customer's purchasing behavior and economic capacity, which are the main actionable driving forces for marketing strategies.</p>
+    <div class="glass-card" style="border-top: 4px solid #4DA8DA;">
+        <h3 style="color:#4DA8DA; margin-top:0;">🛍️ Impulsive Buyers</h3>
+        <p><strong>Action:</strong> Highlight flash sales & FOMO items.</p>
+        <p style="font-size:0.9rem; color:#94A3B8;">They have low income but love to spend. Target them with fast-moving consumer goods, limited-time offers, and bulk discounts.</p>
     </div>
     """, unsafe_allow_html=True)
 
