@@ -250,12 +250,67 @@ with col2:
             cluster_idx = model.predict(new_customer)[0]
             segment = cluster_names[cluster_idx]
             
+            # --- Addition: Cluster characteristics & Insights ---
+            income_c, spend_c = model.cluster_centers_[cluster_idx]
+            
+            # Quantiles calculation
+            low_income = df['Annual Income (k$)'].quantile(0.33)
+            high_income = df['Annual Income (k$)'].quantile(0.66)
+            
+            low_spend = df['Spending Score (1-100)'].quantile(0.33)
+            high_spend = df['Spending Score (1-100)'].quantile(0.66)
+            
+            # Income level bounds
+            if income_c < low_income:
+                income_level = "Low"
+            elif income_c > high_income:
+                income_level = "High"
+            else:
+                income_level = "Medium"
+                
+            # Spending level bounds
+            if spend_c < low_spend:
+                spend_level = "Low"
+            elif spend_c > high_spend:
+                spend_level = "High"
+            else:
+                spend_level = "Medium"
+                
+            customer_type = f"{income_level} Income & {spend_level} Spending"
+            
+            # Business explanation
+            if income_level == "High" and spend_level == "High":
+                insight = "👉 Premium customers → Focus on loyalty & VIP services"
+            elif income_level == "High" and spend_level == "Low":
+                insight = "👉 Target customers → Encourage spending with offers"
+            elif income_level == "Low" and spend_level == "High":
+                insight = "👉 Impulsive buyers → Attract with discounts"
+            elif income_level == "Low" and spend_level == "Low":
+                insight = "👉 Budget customers → Provide low-cost products"
+            else:
+                insight = "👉 Average customers → Maintain engagement"
+            # ----------------------------------------------------
+            
             st.markdown(f"""
             <div class="glass-card" style="border-left: 5px solid {plotly_colors[segment]}; animation: fadeIn 0.5s; padding: 20px; margin-top:20px;">
-                <h4 style="margin:0; color:{plotly_colors[segment]};">Predicted Segment</h4>
-                <h3 style="margin:5px 0 10px 0; color:white;">{segment}</h3>
-                <p style="margin:0; font-size:0.95rem; color:#4DA8DA; font-weight:bold;">📊 Data Reason:</p>
-                <p style="margin:5px 0 0 0; color:#CBD5E1; font-size:0.9rem;">Due to the specific income/spending intersection, this user mathematically maps to Cluster {cluster_idx}.</p>
+                <h4 style="margin:0; color:{plotly_colors[segment]};">Predicted Segment: {segment}</h4>
+                <p style="margin:5px 0 10px 0; color:#CBD5E1; font-size:0.9rem;">Cluster Assignment: <strong>Cluster {cluster_idx}</strong></p>
+                
+                <p style="margin:0; font-size:0.95rem; color:#4DA8DA; font-weight:bold;">🏷️ Customer Classification:</p>
+                <p style="margin:5px 0 10px 0; color:#CBD5E1; font-size:0.9rem;"><strong>{customer_type}</strong></p>
+                
+                <p style="margin:0; font-size:0.95rem; color:#4DA8DA; font-weight:bold;">📌 Cluster Centroid Characteristics:</p>
+                <p style="margin:5px 0 10px 0; color:#CBD5E1; font-size:0.9rem;">Average Income: <b>~{income_c:.2f} k$</b> | Average Spending: <b>~{spend_c:.2f}</b></p>
+                
+                <p style="margin:0; font-size:0.95rem; color:#4DA8DA; font-weight:bold;">💡 Business Insight:</p>
+                <p style="margin:5px 0 10px 0; color:#FBBF24; font-size:0.9rem; font-weight:bold;">{insight}</p>
+                
+                <hr style="border-color: rgba(255,255,255,0.1); margin:15px 0;">
+                <p style="margin:0; font-size:0.8rem; color:#94A3B8; line-height: 1.4;">
+                <b>📊 Data Range Understanding:</b><br>
+                Income (k$): Low (&lt; {low_income:.1f}), Med ({low_income:.1f} - {high_income:.1f}), High (&gt; {high_income:.1f})<br>
+                Spending (1-100): Low (&lt; {low_spend:.1f}), Med ({low_spend:.1f} - {high_spend:.1f}), High (&gt; {high_spend:.1f})
+                </p>
             </div>
             """, unsafe_allow_html=True)
 
