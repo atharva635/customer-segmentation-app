@@ -291,58 +291,52 @@ with col2:
                 insight = "👉 Average customers → Maintain engagement"
             # ----------------------------------------------------
             
-            st.markdown(f"""
-            <div class="glass-card" style="border-left: 5px solid {plotly_colors[segment]}; animation: fadeIn 0.5s; padding: 25px; margin-top:20px;">
-                <!-- HEADER ROW -->
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; margin-bottom: 20px;">
-                    <div>
-                        <p style="margin:0; font-size:0.85rem; color:#94A3B8; text-transform:uppercase; letter-spacing:1px;">Predicted Segment</p>
-                        <h3 style="margin:0; color:white; font-size:1.4rem;">{segment} <span style="font-size:1rem; color:#4DA8DA;">(Cluster {cluster_idx})</span></h3>
-                    </div>
-                    <div style="background: rgba(167, 139, 250, 0.15); padding: 8px 18px; border-radius: 30px; border: 1px solid rgba(167, 139, 250, 0.3);">
-                        <strong style="color:#A78BFA; font-size:0.9rem;">{customer_type}</strong>
-                    </div>
-                </div>
-                
-                <!-- METRICS GRID -->
-                <p style="margin:0 0 10px 0; font-size:0.9rem; color:#94A3B8; text-transform:uppercase; letter-spacing:1px;">📌 Centroid Characteristics</p>
-                <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-                    <div style="flex:1; background: rgba(0,0,0,0.25); padding: 15px; border-radius: 12px; text-align:center; border: 1px solid rgba(255,255,255,0.05);">
-                        <p style="margin:0; color:#CBD5E1; font-size:0.85rem;">Average Income</p>
-                        <h4 style="margin:5px 0 0 0; color:#34D399; font-size:1.3rem;">~{income_c:.1f} k$</h4>
-                    </div>
-                    <div style="flex:1; background: rgba(0,0,0,0.25); padding: 15px; border-radius: 12px; text-align:center; border: 1px solid rgba(255,255,255,0.05);">
-                        <p style="margin:0; color:#CBD5E1; font-size:0.85rem;">Average Spending</p>
-                        <h4 style="margin:5px 0 0 0; color:#4DA8DA; font-size:1.3rem;">~{spend_c:.1f}</h4>
-                    </div>
-                </div>
-                
-                <!-- BUSINESS INSIGHT -->
-                <div style="background: linear-gradient(90deg, rgba(251,191,36,0.15) 0%, rgba(0,0,0,0) 100%); border-left: 3px solid #FBBF24; padding: 15px; border-radius: 4px 12px 12px 4px; margin-bottom: 20px;">
-                    <p style="margin:0; color:#FBBF24; font-size:0.85rem; font-weight:bold; text-transform:uppercase; letter-spacing:0.5px;">💡 Actionable Insight</p>
-                    <p style="margin:5px 0 0 0; color:#FFF; font-size:1.05rem;">{insight}</p>
-                </div>
-                
-                <!-- DATA RANGES -->
-                <div style="padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1);">
-                    <p style="margin:0 0 10px 0; color:#94A3B8; font-size:0.8rem; text-transform:uppercase; letter-spacing:1px;">📊 Data Quantile Reference</p>
-                    <div style="display:flex; gap: 10px;">
-                        <div style="flex:1; font-size:0.85rem; background:rgba(255,255,255,0.03); padding:10px; border-radius:8px;">
-                            <span style="color:#A78BFA; font-weight:bold;">Income Thresholds:</span><br>
-                            <span style="color:#F87171; display:inline-block; margin-top:4px;">Low: &lt; {low_income:.1f}</span><br>
-                            <span style="color:#FBBF24; display:inline-block; margin-top:2px;">Med: {low_income:.1f} - {high_income:.1f}</span><br>
-                            <span style="color:#34D399; display:inline-block; margin-top:2px;">High: &gt; {high_income:.1f}</span>
-                        </div>
-                        <div style="flex:1; font-size:0.85rem; background:rgba(255,255,255,0.03); padding:10px; border-radius:8px;">
-                             <span style="color:#A78BFA; font-weight:bold;">Spending Thresholds:</span><br>
-                            <span style="color:#F87171; display:inline-block; margin-top:4px;">Low: &lt; {low_spend:.1f}</span><br>
-                            <span style="color:#FBBF24; display:inline-block; margin-top:2px;">Med: {low_spend:.1f} - {high_spend:.1f}</span><br>
-                            <span style="color:#34D399; display:inline-block; margin-top:2px;">High: &gt; {high_spend:.1f}</span>
-                        </div>
-                    </div>
-                </div>
+            html_content = f"""
+<div class="glass-card" style="border-left: 5px solid {plotly_colors[segment]}; animation: fadeIn 0.5s; padding: 25px; margin-top:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; margin-bottom: 20px;">
+        <div>
+            <p style="margin:0; font-size:0.85rem; color:#94A3B8; text-transform:uppercase; letter-spacing:1px;">Predicted Segment</p>
+            <h3 style="margin:0; color:white; font-size:1.4rem;">{segment} <span style="font-size:1rem; color:#4DA8DA;">(Cluster {cluster_idx})</span></h3>
+        </div>
+        <div style="background: rgba(167, 139, 250, 0.15); padding: 8px 18px; border-radius: 30px; border: 1px solid rgba(167, 139, 250, 0.3);">
+            <strong style="color:#A78BFA; font-size:0.9rem;">{customer_type}</strong>
+        </div>
+    </div>
+    <p style="margin:0 0 10px 0; font-size:0.9rem; color:#94A3B8; text-transform:uppercase; letter-spacing:1px;">📌 Centroid Characteristics</p>
+    <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+        <div style="flex:1; background: rgba(0,0,0,0.25); padding: 15px; border-radius: 12px; text-align:center; border: 1px solid rgba(255,255,255,0.05);">
+            <p style="margin:0; color:#CBD5E1; font-size:0.85rem;">Average Income</p>
+            <h4 style="margin:5px 0 0 0; color:#34D399; font-size:1.3rem;">~{income_c:.1f} k$</h4>
+        </div>
+        <div style="flex:1; background: rgba(0,0,0,0.25); padding: 15px; border-radius: 12px; text-align:center; border: 1px solid rgba(255,255,255,0.05);">
+            <p style="margin:0; color:#CBD5E1; font-size:0.85rem;">Average Spending</p>
+            <h4 style="margin:5px 0 0 0; color:#4DA8DA; font-size:1.3rem;">~{spend_c:.1f}</h4>
+        </div>
+    </div>
+    <div style="background: linear-gradient(90deg, rgba(251,191,36,0.15) 0%, rgba(0,0,0,0) 100%); border-left: 3px solid #FBBF24; padding: 15px; border-radius: 4px 12px 12px 4px; margin-bottom: 20px;">
+        <p style="margin:0; color:#FBBF24; font-size:0.85rem; font-weight:bold; text-transform:uppercase; letter-spacing:0.5px;">💡 Actionable Insight</p>
+        <p style="margin:5px 0 0 0; color:#FFF; font-size:1.05rem;">{insight}</p>
+    </div>
+    <div style="padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1);">
+        <p style="margin:0 0 10px 0; color:#94A3B8; font-size:0.8rem; text-transform:uppercase; letter-spacing:1px;">📊 Data Quantile Reference</p>
+        <div style="display:flex; gap: 10px;">
+            <div style="flex:1; font-size:0.85rem; background:rgba(255,255,255,0.03); padding:10px; border-radius:8px;">
+                <span style="color:#A78BFA; font-weight:bold;">Income Thresholds:</span><br>
+                <span style="color:#F87171; display:inline-block; margin-top:4px;">Low: &lt; {low_income:.1f}</span><br>
+                <span style="color:#FBBF24; display:inline-block; margin-top:2px;">Med: {low_income:.1f} - {high_income:.1f}</span><br>
+                <span style="color:#34D399; display:inline-block; margin-top:2px;">High: &gt; {high_income:.1f}</span>
             </div>
-            """, unsafe_allow_html=True)
+            <div style="flex:1; font-size:0.85rem; background:rgba(255,255,255,0.03); padding:10px; border-radius:8px;">
+                 <span style="color:#A78BFA; font-weight:bold;">Spending Thresholds:</span><br>
+                <span style="color:#F87171; display:inline-block; margin-top:4px;">Low: &lt; {low_spend:.1f}</span><br>
+                <span style="color:#FBBF24; display:inline-block; margin-top:2px;">Med: {low_spend:.1f} - {high_spend:.1f}</span><br>
+                <span style="color:#34D399; display:inline-block; margin-top:2px;">High: &gt; {high_spend:.1f}</span>
+            </div>
+        </div>
+    </div>
+</div>
+"""
+            st.markdown(html_content, unsafe_allow_html=True)
 
 # --- 4. ADVANCED DEEP EXPERT VISUALS ---
 st.markdown("<hr style='border-color: rgba(255,255,255,0.1); margin:40px 0;'>", unsafe_allow_html=True)
