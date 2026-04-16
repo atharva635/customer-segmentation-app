@@ -383,7 +383,7 @@ with eb_col1:
     st.markdown(f"""
     <div class="glass-card" style="border-left: 5px solid #FBBF24;">
         <h4 style="color:#A78BFA; margin-top:0;">DBSCAN vs K-Means</h4>
-        <h2 style="color:#34D399; margin:10px 0 0 0;">K-Means: {sil_score:.2f}</h2>
+        <h2 style="color:#34D399; margin:10px 0 0 0;">K-Means: {best_k_auto}</h2>
         <h2 style="color:#F87171; margin:0 0 10px 0;">DBSCAN: {dbscan_sil:.2f}</h2>
         <p style="color:#CBD5E1; font-size:0.9rem;">We rigorously tested DBSCAN as an alternative. However, because our data forms <strong>spherical clusters</strong> rather than dense arbritrary shapes, K-Means mathematically outperforms DBSCAN massively on the Silhouette scale.</p>
     </div>
