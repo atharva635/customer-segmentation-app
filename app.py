@@ -187,7 +187,7 @@ def train_model(X_data):
         wcss.append(km.inertia_)
         sil_scores.append(silhouette_score(X_data, labels))
         
-    best_k = K_range_sil[np.argmax(sil_scores)]
+    best_k = 5
     
     # Train final optimal model
     model = KMeans(n_clusters=best_k, init='k-means++', random_state=42)
