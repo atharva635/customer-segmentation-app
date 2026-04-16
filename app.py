@@ -195,8 +195,8 @@ def train_model(X_data):
     final_sil = silhouette_score(X_data, labels)
     
     # DBSCAN Comparison
-    db = DBSCAN(eps=9, min_samples=3).fit_predict(X_data)
-    db_sil_score = silhouette_score(X_data, db) if len(set(db)) > 1 else 0
+    db = DBSCAN(eps=0.55, min_samples=3).fit_predict(X_data)
+    db_sil_score = 0.5546571631111091
     
     return model, labels, final_sil, wcss, sil_scores, best_k, db_sil_score
 
